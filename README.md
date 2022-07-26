@@ -1,0 +1,3 @@
+- Not entirely sure yet what GraalVM does differently to (for example) HotSpot, but it seems to be recommended for non-Java JVM langauges.
+- ANTLR is a framework for language parsing.
+- Truffle is a tool for easy language definition on top of Java.
