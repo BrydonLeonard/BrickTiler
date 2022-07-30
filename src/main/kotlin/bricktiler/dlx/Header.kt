@@ -72,6 +72,8 @@ class Header(val column: Int, val desiredValue: Int = 1) {
         return null
     }
 
+    operator fun get(row: Int): Node? = getNodeInRow(row)
+
     fun addRight(header: Header) {
         this.right = header
         header.left = this
@@ -176,7 +178,7 @@ class Header(val column: Int, val desiredValue: Int = 1) {
             node = node.down
         }
 
-        if (node.row > node.row) {
+        if (node.row > newNode.row) {
             node.up.addDown(newNode)
             node.addUp(newNode)
             first = last?.down

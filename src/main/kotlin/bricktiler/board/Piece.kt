@@ -1,36 +1,14 @@
-package bricktiler
+package bricktiler.board
 
-import bricktiler.dlx.SparseMatrix
+import bricktiler.board.BoardUtils.toTwoDimensions
 
 data class Board(val width: Int, val height: Int)
 
 data class Position(val x: Int, val y: Int)
 
-object BoardUtils {
-    fun makeSparseMatrix(desiredSolution: List<Int>, board: Board, pieces: List<Pair<Piece, Int>>): SparseMatrix {
-        val sparseMatrix = SparseMatrix(desiredSolution)
-        var row = 0
-
-        pieces.forEach { (piece, value) ->
-            piece.getAllValidTopLeftPositions(board).forEach { topLeft ->
-                piece.topLeftToPieceCovering(topLeft, board).forEach { topLeft ->
-                    sparseMatrix.add(topLeft, row, value)
-                }
-                row++
-            }
-        }
-
-        return sparseMatrix
-    }
-}
-
-class Piece(val width: Int, val height: Int) {
+data class Piece(val width: Int, val height: Int) {
     fun getAllValidTopLeftPositions(board: Board): List<Int> {
         val oneDimensionalWidth = board.width * board.height
-
-        // "Additional" here is in addition to the 1x1 square already taken up by the top left corner.
-        val additionalWidth = width - 1
-        val additionalHeight = height - 1
 
         return List(oneDimensionalWidth) { topLeft ->
             val topLeft2D = toTwoDimensions(topLeft, board)
@@ -45,12 +23,27 @@ class Piece(val width: Int, val height: Int) {
         }.filterNotNull()
     }
 
-    private fun toTwoDimensions(x: Int, board: Board) = Position(x % board.width, x / board.height)
-    private fun bottomRight(topLeft: Position) = Position(topLeft.x + width - 1, topLeft.y + height - 1)
+    fun bottomRight(topLeft: Position) = Position(topLeft.x + width - 1, topLeft.y + height - 1)
+
+    override fun toString() = "${width}x$height"
 
     fun topLeftToPieceCovering(topLeft: Int, board: Board): List<Int> = List(this.height) { verticalOffset ->
             List(this.width) { horizontalOffset ->
                 topLeft + verticalOffset * board.width + horizontalOffset
             }
         }.flatten()
+
+    companion object {
+        fun allPiecesWithValue(value: Int): List<Pair<Piece, Int>> = LegoSizes.values().map { Piece(it.width, it.height) to value }
+    }
+}
+
+enum class LegoSizes(val width: Int, val height: Int) {
+    TWO_BY_ONE(2, 1),
+    ONE_BY_TWO(1, 2),
+    TWO_BY_TWO(2, 2),
+    TWO_BY_THREE(2, 3),
+    THREE_BY_TWO(3, 2),
+    TWO_BY_FOUR(2, 4),
+    FOUR_BY_TWO(4, 2);
 }

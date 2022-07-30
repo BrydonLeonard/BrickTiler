@@ -13,6 +13,9 @@ class SparseMatrix private constructor(private val width: Int, private val desir
     // Because I don't feel like traversing the LL to get to a header every time.
     val headers: MutableList<Header> = mutableListOf(firstCol)
 
+    val height: Int
+        get() = headers.filter { !it.covered }.maxOf { (it.last?.run { row + 1 }) ?: 0 }
+
     init {
         // Since the list is circular, adding to the left of the first element is the same as adding to the end. Neat
         repeat(width - 1) {

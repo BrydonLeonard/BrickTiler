@@ -1,59 +1,46 @@
 package bricktiler
 
-import bricktiler.dlx.SparseMatrix
+import bricktiler.board.Board
+import bricktiler.board.BoardUtils
+import bricktiler.board.Piece
+import bricktiler.dlx.ErrorAggregator
 import bricktiler.dlx.ExactCoverSolver
-import bricktiler.naive.MutableMatrix
-import bricktiler.naive.ExactCoverSolver as NaiveSolver
+import bricktiler.dlx.SolutionConfig
+import bricktiler.image.ImageManager
 
 
 object BrickTiler {
     @JvmStatic
     fun main(args: Array<String>) {
-        val matrix = mutableListOf<MutableList<Int>>(
-                mutableListOf(1, 0, 0, 1, 0, 0, 1),
-                mutableListOf(1, 0, 0, 3, 0, 0, 0),
-                mutableListOf(0, 0, 0, 1, 1, 0, 1),
-                mutableListOf(0, 0, 3, 0, 1, 2, 0),
-                mutableListOf(0, 1, 1, 0, 0, 1, 1),
-                mutableListOf(0, 2, 0, 0, 0, 0, 4),
-                mutableListOf(0, 2, 0, 0, 0, 0, 2),
-        )
+        val board = Board(5, 5)
+        val image = ImageManager.fromFile(board.width, board.height, 4)
+        val desiredSolution = image.asOneDimensionalArray().map { it + 1 }
 
-        val mutableMatrix = MutableMatrix<Int>(matrix)
+        println("Desired image is:\n$image")
 
-        val desiredSolution = listOf(
-                1, 2, 3, 3, 1, 2, 2
-        )
+        val pieces = List(4) { value ->
+            // We want values in [1, 4]
+            Piece.allPiecesWithValue(value + 1).reversed()
+        }.flatten()
 
-        val sparseMatrix = SparseMatrix(desiredSolution)
-        matrix.forEachIndexed { y: Int, row: MutableList<Int> ->
-            row.forEachIndexed { x: Int, value: Int ->
-                if (value > 0) {
-                    sparseMatrix.add(x, y, value)
-                }
-            }
-        }
+        val piecesString = pieces.joinToString("\n") { "${it.first} (${it.second})"}
+        println("Valid pieces are:\n$piecesString")
 
+        val (sparseMatrix, piecePositions) = BoardUtils.makeSparseMatrix(desiredSolution, board, pieces, false)
 
-        println("Seeking $desiredSolution in:")
-        println(sparseMatrix)
+        println("Matrix height is ${sparseMatrix.height}")
 
-        val solutions = ExactCoverSolver.solve(sparseMatrix)
+        val solutions = ExactCoverSolver.solve(sparseMatrix, SolutionConfig(onlyExactMatches = false, errorAggregator = ErrorAggregator.ABS_SUM, maxPerPieceError = 3, exitOnFirstSolution = true)).toSet().toList()
 
         if (solutions.isEmpty()) {
             println("No solutions :(")
-        }
+        } else {
+            println("Found ${solutions.size} solutions")
 
-        solutions.forEach {
-            println(sparseMatrix.rowsToString(it.solutionRows.sorted()))
-            println()
-        }
+            val randomSolution = solutions.random()
 
-        val naiveSolutions = NaiveSolver.solve(mutableMatrix)
-        naiveSolutions.forEach {
-           // println(it)
+            println(BoardUtils.describeSolution(randomSolution, board, piecePositions))
         }
-
     }
 
 }
