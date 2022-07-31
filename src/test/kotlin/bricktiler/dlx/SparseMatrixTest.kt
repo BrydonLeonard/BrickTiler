@@ -49,6 +49,8 @@ class SparseMatrixTest {
         assertTrue(headers[4].first!!.value == 4)
         assertTrue(headers[4].first!!.down.down.value == 3)
 
+        println(matrix)
+
         // Check that the corners wrap around
         headers[0].first!!.down.down shouldBeAbove headers[0].first!!
         headers[4].first!!.down.down shouldBeAbove headers[4].first!!

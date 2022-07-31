@@ -1,5 +1,7 @@
 package bricktiler.dlx
 
+import bricktiler.board.PiecePosition
+
 /**
  * If I felt like _thinking_, I could make the column count flexible, but it's much easier to just start with a known
  * width.
@@ -12,6 +14,11 @@ class SparseMatrix private constructor(private val width: Int, private val desir
 
     // Because I don't feel like traversing the LL to get to a header every time.
     val headers: MutableList<Header> = mutableListOf(firstCol)
+    private val uncoveredHeaders: MutableSet<Header> = mutableSetOf()
+    fun uncoveredHeaders(): Set<Header> = uncoveredHeaders
+
+    private val rows: MutableList<PiecePosition?> = mutableListOf()
+
 
     val height: Int
         get() = headers.filter { !it.covered }.maxOf { (it.last?.run { row + 1 }) ?: 0 }
@@ -23,6 +30,16 @@ class SparseMatrix private constructor(private val width: Int, private val desir
             firstCol.left.addRight(newHeader)
             firstCol.addLeft(newHeader)
             headers.add(newHeader)
+            uncoveredHeaders.add(newHeader)
+        }
+    }
+
+    /**
+     * Add row metadata. Useful for applying constraints and turning a solved matrix into a usable solution
+     */
+    fun setRow(piecePosition: PiecePosition, matrixRow: Int) {
+        if (rows.size <= matrixRow) {
+            rows.add(piecePosition)
         }
     }
 
@@ -30,10 +47,22 @@ class SparseMatrix private constructor(private val width: Int, private val desir
         require(x < width) { "This is a circular LL, doesn't mean we're going to wrap around to insert things. " +
                 "Requested column '$x' is greater than the matrix width of '$width'" }
 
+        require(y < rows.count()) { "Attempted to add to row $y before initialization. The matrix has ${rows.count()} rows." }
+
         headers[x].insert(y, value)
     }
 
-    fun shortestUncoveredColumn() = headers.filter { !it.covered }.minByOrNull { it.count }
+    // TODO inefficient
+    fun shortestUncoveredColumn() = uncoveredHeaders.minByOrNull { it.count }
+    fun coverColumn(header: Header) {
+        header.cover()
+        uncoveredHeaders.remove(header)
+    }
+
+    fun uncoverColumn(header: Header) {
+        header.uncover()
+        uncoveredHeaders.add(header)
+    }
 
     /**
      * Gotta sanity check this mess somehow

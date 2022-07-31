@@ -16,6 +16,14 @@ class Header(val column: Int, val desiredValue: Int = 1) {
         private set
 
     /**
+     * Mapping of row index: node
+     * TODO: Should be private
+     */
+    val nodes = HashMap<Int, Node>()
+
+
+
+    /**
      * Covers this column and all rows in which it has a value
      */
     fun cover() {
@@ -53,24 +61,14 @@ class Header(val column: Int, val desiredValue: Int = 1) {
     }
 
     /**
-     * Return the node in a given row in this column. Null if no value is present in the column
+     * Return the node in a given row in this column. Null if no value is present in the column.
+     *
+     * Once upon a time, this followed points, but that takes too long. Use the HashMap instead.
      */
-    fun getNodeInRow(row: Int): Node? {
-        var node = first ?: return null
-
-        while (node != last) {
-            if (node.row == row) {
-                return node
-            }
-            node = node.down
+    fun getNodeInRow(row: Int): Node? = nodes[row]?.let {
+            if (it.covered) null else it
         }
 
-        if (node.row == row) {
-            return node
-        }
-
-        return null
-    }
 
     operator fun get(row: Int): Node? = getNodeInRow(row)
 
@@ -87,6 +85,7 @@ class Header(val column: Int, val desiredValue: Int = 1) {
     fun insert(row: Int, value: Int) {
         count++
         val newNode = Node(this, row, value)
+        nodes[row] = newNode
         insertIntoColumn(newNode)
         insertIntoRow(newNode)
     }

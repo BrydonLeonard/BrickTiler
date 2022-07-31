@@ -71,10 +71,14 @@ class ExactCoverSolverTest {
         // Given the selection of bricks and board size, we only expect a single solution.
         assertEquals(4, solutions.size, "Didn't find any solutions, but expected to find 1")
 
-        assertThat(solutions[0].solutionRows, containsInAnyOrder(11, 10, 9, 8, 15, 2, 1, 0))
-        assertThat(solutions[1].solutionRows, containsInAnyOrder(11, 22, 9, 8, 15, 2, 1, 0))
-        assertThat(solutions[2].solutionRows, containsInAnyOrder(11, 10, 9, 8, 15, 14, 1, 0))
-        assertThat(solutions[3].solutionRows, containsInAnyOrder(11, 22, 9, 8, 15, 14, 1, 0))
+        val solutionRows = solutions.map { it.solutionRows.toSet() }
+
+        assertThat(solutionRows, containsInAnyOrder(
+            setOf(11, 10, 9, 8, 15, 2, 1, 0),
+            setOf(11, 22, 9, 8, 15, 2, 1, 0),
+            setOf(11, 10, 9, 8, 15, 14, 1, 0),
+            setOf(11, 22, 9, 8, 15, 14, 1, 0)
+        ))
     }
 
     @Test

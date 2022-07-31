@@ -23,7 +23,8 @@ object BoardUtils {
                 val covering = piece.topLeftToPieceCovering(topLeft, board)
 
                 if (includeInvalidRows || covering.any { position -> desiredSolution[position] == value }){
-                    piecePositions.add(PiecePosition(piece, topLeft, value))
+                    val piecePosition = PiecePosition(piece, topLeft, value)
+                    piecePositions.add(piecePosition)
                     covering.forEach { position ->
                         sparseMatrix.add(position, row, value)
                     }
@@ -36,12 +37,23 @@ object BoardUtils {
     }
 
     fun describeSolution(solution: Solution, board: Board, piecePositions: List<PiecePosition>) =
-        solution.solutionRows.joinToString("\n") { row ->
+        solution.solutionRows.flatMap { row ->
+            val piece = piecePositions[row]
+            val pieceCovering = piece.piece.topLeftToPieceCovering(piece.oneDimensionalPosition, board)
+
+            pieceCovering.map {
+                val twoDimensionalPosition = toTwoDimensions(it, board)
+                Position(twoDimensionalPosition.x, twoDimensionalPosition.y) to piecePositions[row].value
+            }
+        }.toMap()
+
+    fun describeSolutionAsString(solution: Solution, board: Board, piecePositions: List<PiecePosition>) =
+        solution.solutionRows.map { row ->
             val piecePosition = piecePositions[row]
 
-            val twoDimensionalPosition = toTwoDimensions(piecePosition.oneDimensionalPosition, board)
-
-            "size=${piecePosition.piece}, colour=${piecePosition.value}, position=$twoDimensionalPosition"
+            Pair(piecePosition, toTwoDimensions(piecePosition.oneDimensionalPosition, board))
+        }.sortedBy { it.second.x }.sortedBy { it.second.y }.joinToString("\n") { (piecePosition, twoDimPosition) ->
+            "${piecePosition.piece}, ${piecePosition.value}, $twoDimPosition"
         }
 
 

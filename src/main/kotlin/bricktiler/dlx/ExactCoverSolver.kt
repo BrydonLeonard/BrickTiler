@@ -9,7 +9,7 @@ import kotlin.random.Random
  */
 public data class SolutionConfig(
         val onlyExactMatches: Boolean = false,
-        val maxPerPieceError: Int = 1,
+        val maxPerPieceError: Double = 1.0,
         val errorAggregator: ErrorAggregator = ErrorAggregator.COUNT,
         val exitOnFirstSolution: Boolean = false
 )
@@ -23,44 +23,42 @@ enum class ErrorAggregator(val aggregate: (List<Int>) -> Double) {
 object ExactCoverSolver {
 
     fun solve(matrix: SparseMatrix, config: SolutionConfig = SolutionConfig()): List<Solution> {
-        val headerWithFewestOnes = matrix.shortestUncoveredColumn ?: return listOf(Solution())
+        val headerWithFewestOnes = matrix.shortestUncoveredColumn() ?: return listOf(Solution())
 
-        // This is the bit where we try a bunch of rows (recursively) to see what works
-        var chosenRowNode = headerWithFewestOnes.first
-        var count = 0
         val solutions = mutableListOf<Solution>()
 
-        while (chosenRowNode != null && (chosenRowNode != headerWithFewestOnes.first || count == 0)) {
-
-            val error = calculateError(chosenRowNode, config)
+        headerWithFewestOnes.nodes.toList().shuffled().forEach { (row, node) ->
+            if (node.covered) {
+                return@forEach
+            }
+            // TODO: Speed up error calculation
+            val error = calculateError(node, config)
 
             if ((config.onlyExactMatches && error > 0) || (!config.onlyExactMatches && error > 1)) {
-                chosenRowNode = chosenRowNode.down
-                continue
+                return@forEach
             }
 
-            val chosenRowIndex = chosenRowNode.row
+            val chosenRowIndex = node.row
 
-            val columnsWithOnesInChosenRow = matrix.headers.filter { !it.covered && it.getNodeInRow(chosenRowIndex) != null }
+            val columnsWithOnesInChosenRow = matrix.uncoveredHeaders().filter { it.getNodeInRow(chosenRowIndex) != null }
 
-            columnsWithOnesInChosenRow.forEach { it.cover() }
+            // TODO inefficient
+            columnsWithOnesInChosenRow.forEach { matrix.coverColumn(it) }
 
             val subSolutions = solve(matrix, config)
 
-            columnsWithOnesInChosenRow.reversed().forEach { it.uncover() }
+            // TODO inefficient
+            columnsWithOnesInChosenRow.forEach { matrix.uncoverColumn(it) }
 
             solutions.addAll(
                     subSolutions.map {
-                        it + chosenRowNode!!.row
+                        it + node.row
                     }
             )
 
             if (solutions.size > 0 && config.exitOnFirstSolution) {
                 return solutions
             }
-
-            chosenRowNode = chosenRowNode.down
-            count++
         }
 
         return solutions
