@@ -3,6 +3,7 @@ package bricktiler.board
 import bricktiler.Solution
 import bricktiler.dlx.SparseMatrix
 
+// TODO these two data classes could be combined a little more neatly
 data class PiecePosition(
     val piece: Piece,
     val oneDimensionalPosition: Int,
@@ -22,7 +23,7 @@ object BoardUtils {
             piece.getAllValidTopLeftPositions(board).forEach { topLeft ->
                 val covering = piece.topLeftToPieceCovering(topLeft, board)
 
-                if (includeInvalidRows || covering.any { position -> desiredSolution[position] == value }){
+                if (includeInvalidRows || covering.all { position -> desiredSolution[position] == value }){
                     val piecePosition = PiecePosition(piece, topLeft, value)
                     piecePositions.add(piecePosition)
                     covering.forEach { position ->

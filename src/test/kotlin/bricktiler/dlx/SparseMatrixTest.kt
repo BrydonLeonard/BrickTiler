@@ -1,7 +1,11 @@
 package bricktiler.dlx
 
-import org.junit.jupiter.api.Assertions.assertTrue
+import org.hamcrest.MatcherAssert.assertThat
+import org.hamcrest.Matchers.*
+import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import kotlin.random.Random
 
 class SparseMatrixTest {
     @Test
@@ -28,6 +32,8 @@ class SparseMatrixTest {
                 assertTrue(matrix.headers[index + 1].left == header)
             }
         }
+
+        assertEquals(5, matrix.width)
     }
 
     @Test
@@ -68,6 +74,7 @@ class SparseMatrixTest {
         headers[3].first!!.down shouldBeLeftOf headers[3].first!!.down // Should be left of itself
     }
 
+    @Test
     fun `covers correctly`() {
         val matrix = buildMatrix()
 
@@ -94,10 +101,18 @@ class SparseMatrixTest {
         // Cover 1
         headers[3].cover()
 
+        headers.filter { !it.covered }.forEach  {
+            assertTrue(columnCycles(it), "All columns should cycle")
+        }
+
         verifyOne()
 
         // Cover ANOTHER!
         headers[0].cover()
+
+        headers.filter { !it.covered }.forEach  {
+            assertTrue(columnCycles(it), "All columns should cycle")
+        }
 
         assertTrue(headers[4].count == 0)
 
@@ -114,9 +129,17 @@ class SparseMatrixTest {
         // We're very sorry for the inconvenience and would like to replace the column at no extra cost
         headers[0].uncover()
 
+        headers.filter { !it.covered }.forEach  {
+            assertTrue(columnCycles(it), "All columns should cycle")
+        }
+
         verifyOne()
 
         headers[3].uncover()
+
+        headers.filter { !it.covered }.forEach  {
+            assertTrue(columnCycles(it), "All columns should cycle")
+        }
 
         repeat(5) {
             assertTrue(!headers[it].covered)
@@ -127,6 +150,134 @@ class SparseMatrixTest {
         assertTrue(headers[2].count == 1)
         assertTrue(headers[3].count == 2)
         assertTrue(headers[4].count == 3)
+    }
+
+    @Test()
+    fun `lots of covering and uncovering to make sure it all works`() {
+        /*
+            0	0	0	1	0	0	0
+            0	1	0	1	1	0	0
+            1	1	1	1	1	1	1
+            1	0	1	0	1	0	0
+            0	0	1	0	0	0	0
+         */
+
+        val matrix = SparseMatrix(200)
+
+        val claimedCells = mutableSetOf<Pair<Int, Int>>()
+
+        repeat(100) {
+            val position = Pair(Random.nextInt(200), Random.nextInt(100))
+            if (!claimedCells.contains(position)) {
+                matrix.add(position.first, position.second, 1)
+                claimedCells.add(position)
+            }
+        }
+
+        var latest = 0
+
+        repeat(500) {
+            when {
+                latest == 0 -> matrix.headers[latest++].cover()
+                latest < 50 -> if (Random.nextInt(100) < 60) matrix.headers[latest++].cover() else matrix.headers[latest--].uncover()
+                else -> if (Random.nextInt(100) < 50) matrix.headers[latest++].cover() else matrix.headers[latest--].uncover()
+            }
+
+
+            matrix.headers.filter { !it.covered }.forEach  {
+                assertTrue(columnCycles(it), "All columns should cycle")
+            }
+        }
+
+        while (latest >= 0) {
+            matrix.headers[latest--].uncover()
+        }
+    }
+
+    @Nested
+    inner class Clone {
+        @Test
+        fun `clone works for an uncovered matrix`() {
+            val matrix = buildMatrix()
+
+            val clone = matrix.cloneUncovered()
+
+            matrix.headers.forEachIndexed { index, header ->
+                val cloneHeader = clone.headers[index]
+                assertHeaderEquality(header, cloneHeader)
+            }
+        }
+
+        @Test
+        fun `clone works for a partially covered matrix`() {
+            val matrix = SparseMatrix(3)
+
+            // Corners. This will cover wrapping and adding in the same row/column as another element
+            matrix.add(0,0, 1)
+            matrix.add(0, 2, 2)
+            matrix.add(1, 1, 2)
+            matrix.add(1, 2, 2)
+            matrix.add(2, 3, 2)
+            matrix.add(2, 4, 2)
+            matrix.coverColumn(matrix.headers[0])
+
+            val clone = matrix.cloneUncovered()
+
+            matrix.headers.filter { !it.covered }.forEachIndexed { index, header ->
+                val cloneHeader = clone.headers[index]
+                assertHeaderEquality(header, cloneHeader)
+            }
+        }
+
+        @Test
+        fun `clone works for a fully covered matrix`() {
+            val matrix = SparseMatrix(3)
+
+            /*
+            1 0 0
+            0 2 0
+            2 2 0
+            0 0 2
+            0 0 2
+             */
+            matrix.add(0,0, 1)
+            matrix.add(0, 2, 2)
+            matrix.add(1, 1, 3)
+            matrix.add(1, 2, 4)
+            matrix.add(2, 3, 5)
+            matrix.add(2, 4, 6)
+            matrix.coverColumn(matrix.headers[0])
+            matrix.coverColumn(matrix.headers[1])
+            matrix.coverColumn(matrix.headers[2])
+
+            val clone = matrix.cloneUncovered()
+
+            assertEquals(0, clone.headers.size)
+            assertThat(clone.uncoveredHeaders(), hasSize(0))
+        }
+
+        private fun assertHeaderEquality(header: Header, cloneHeader: Header) {
+            assertEquals(header.count, cloneHeader.count)
+
+            assertEquals(header.first!!.row, cloneHeader.first!!.row)
+            assertEquals(header.first!!.value, cloneHeader.first!!.value)
+            assertEquals(header.last!!.row, cloneHeader.last!!.row)
+            assertEquals(header.last!!.value, cloneHeader.last!!.value)
+
+            var iterNode = header.first
+            var cloneIterNode = cloneHeader.first
+
+
+            while (iterNode != header.last) {
+                assertEquals(iterNode!!.value, cloneIterNode!!.value)
+                assertEquals(iterNode!!.row, cloneIterNode!!.row)
+
+                iterNode = iterNode!!.down
+                cloneIterNode = cloneIterNode!!.down
+
+
+            }
+        }
     }
 
     private fun buildMatrix(): SparseMatrix {
@@ -169,5 +320,36 @@ class SparseMatrixTest {
         assertTrue(this.right == other)
         assertTrue(other.left == this)
         return other
+    }
+
+    private fun columnCycles(header: Header): Boolean {
+        if (header.first == null) {
+            return true
+        }
+        var node = header.first!!.down
+
+        val visited = mutableSetOf<Node>()
+
+        while (node != header.first!!) {
+            node = node.down
+            if (visited.contains(node)) {
+                return false
+            }
+            visited.add(node)
+        }
+
+        node = header.last!!.up
+
+        visited.clear()
+
+        while (node != header.last!!) {
+            node = node.up
+            if (visited.contains(node)) {
+                return false
+            }
+            visited.add(node)
+        }
+
+        return true
     }
 }

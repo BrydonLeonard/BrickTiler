@@ -1,20 +1,36 @@
 package bricktiler
 
 class Solution {
-    val solutionRows: MutableList<Int> = mutableListOf()
+    val solutionRows: MutableSet<Int> = mutableSetOf()
 
-    fun addRows(rows: List<Int>) {
+    operator fun plus(row: Int) = Solution().add(this).add(row)
+
+    fun add(rows: Set<Int>) {
         solutionRows.addAll(rows)
     }
 
-    operator fun plus(other: Solution): Solution {
-        addRows(other.solutionRows)
+    fun add(other: Solution): Solution {
+        add(other.solutionRows)
         return this
     }
 
-    operator fun plus(rowIndex: Int): Solution {
+    fun add(rowIndex: Int): Solution {
         solutionRows.add(rowIndex)
         return this
+    }
+
+    fun remove(rows: Set<Int>): Solution {
+        solutionRows.removeAll(rows)
+        return this
+    }
+
+    fun remove(row: Int): Solution {
+        solutionRows.remove(row)
+        return this
+    }
+
+    fun clone(): Solution {
+        return Solution().add(this)
     }
 
     override fun toString(): String {

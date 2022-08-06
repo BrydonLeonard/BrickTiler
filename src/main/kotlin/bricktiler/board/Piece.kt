@@ -7,6 +7,8 @@ data class Board(val width: Int, val height: Int)
 data class Position(val x: Int, val y: Int)
 
 data class Piece(val width: Int, val height: Int) {
+    constructor(legoSize: LegoSizes): this(legoSize.width, legoSize.height)
+
     val size = width * height
 
     fun getAllValidTopLeftPositions(board: Board): List<Int> {

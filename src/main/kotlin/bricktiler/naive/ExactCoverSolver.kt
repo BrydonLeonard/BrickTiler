@@ -44,7 +44,7 @@ object ExactCoverSolver {
                     // here, we have multiple choice. As such, we stick the solutions together and return them back down/up
                     // the stack.
                     subSolutions.filterIsInstance<Solution>().map {
-                        it + matrix.originalRows[chosenRowIndex]
+                        it.add(matrix.originalRows[chosenRowIndex])
                     }
                 }
     }

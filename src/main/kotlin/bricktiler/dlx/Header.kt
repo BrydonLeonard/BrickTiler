@@ -21,8 +21,6 @@ class Header(val column: Int, val desiredValue: Int = 1) {
      */
     val nodes = HashMap<Int, Node>()
 
-
-
     /**
      * Covers this column and all rows in which it has a value
      */
@@ -52,6 +50,7 @@ class Header(val column: Int, val desiredValue: Int = 1) {
 
         var rowNode = last
 
+        // TODO sometimes this runs infinitely
         while (rowNode != first && rowNode != null) {
             uncoverRow(rowNode)
             rowNode = rowNode.up
@@ -93,7 +92,7 @@ class Header(val column: Int, val desiredValue: Int = 1) {
     /**
      * Will cover all nodes in the row _except_ the one passed in as an argument
      */
-    private fun coverRow(startingNode: Node?) {
+    fun coverRow(startingNode: Node?) {
         startingNode ?: return
 
         var node = startingNode.right
@@ -123,8 +122,12 @@ class Header(val column: Int, val desiredValue: Int = 1) {
     /**
      * Will uncover all nodes in the given row _except_ the one provided as an arugment
      */
-    private fun uncoverRow(startingNode: Node?) {
+    fun uncoverRow(startingNode: Node?) {
         startingNode ?: return
+
+        if (startingNode.header != this) {
+            println("THis is a little weird (un)")
+        }
 
         var node = startingNode.left
 
@@ -149,7 +152,6 @@ class Header(val column: Int, val desiredValue: Int = 1) {
 
             node = node.left
         }
-
     }
 
     /**

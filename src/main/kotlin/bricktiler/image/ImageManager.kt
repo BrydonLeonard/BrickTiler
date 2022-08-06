@@ -43,7 +43,7 @@ class ImageManager private constructor(val image: ImagePlus) {
             System.setProperty("java.version", "1.8")
         }
 
-        fun downscaleFromFile(width: Int, height: Int, colourCount: Int, imagePath: String = "C:/Users/user-pc/Desktop/gradient.jpg"): ImageManager {
+        fun downscaleFromFile(width: Int, height: Int, colourCount: Int, imagePath: String = "C:/Users/user-pc/Desktop/headpon.png"): ImageManager {
             setupEnv()
 
             val imp = IJ.openImage(imagePath)
