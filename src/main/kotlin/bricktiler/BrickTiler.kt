@@ -2,6 +2,7 @@ package bricktiler
 
 import bricktiler.board.*
 import bricktiler.dlx.*
+import bricktiler.dlx.ExactCoverSolver.statTracker.deadEnds
 import bricktiler.image.ImageManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asCoroutineDispatcher
@@ -22,12 +23,12 @@ object BrickTiler {
         val pieces = List(4) { value ->
             // We want values in [1, 4]
             Piece.allPiecesWithValue(value + 1)
-        }.flatten().sortedByDescending { it.first.size }
+        }.flatten()
 
         val piecesString = pieces.joinToString("\n") { "${it.first} (${it.second})" }
         println("Valid pieces are:\n$piecesString")
 
-        val (sparseMatrix, piecePositions) = BoardUtils.makeSparseMatrix(desiredSolution, board, pieces, includeInvalidRows = false)
+        val (sparseMatrix, piecePositions) = BoardUtils.makeSparseMatrix(desiredSolution, board, pieces, includeInvalidRows = false, maxPerPieceError = 1.0)
 
         println("Matrix height is ${sparseMatrix.height}")
 
@@ -64,11 +65,11 @@ object BrickTiler {
         val contraintsValidator = PieceCountConstraintValidator(pieceConstraints, piecePositions)
 
         val config = SolutionConfig(
-            errorChecking = ErrorChecking.ALLOW_ERRORS,
+            errorChecking = ErrorChecking.NO_CHECK,
             exitOnFirstSolution = true,
             maxPerPieceError = 2,
             constraintValidator = contraintsValidator,
-            maxRecursiveDepth = 4
+            maxRecursiveDepth = 2
         )
 
         val dispatcher = Executors
@@ -78,11 +79,15 @@ object BrickTiler {
         val solutions = runBlocking(dispatcher) {
             ExactCoverSolver.solve(
                 sparseMatrix, config
-            ).toSet().toList()
+            ).also{
+                println("??")
+            }.toSet().toList()
+
         }
 
         if (solutions.isEmpty()) {
             println("No solutions :(")
+            println("Found ${deadEnds} dead ends")
         } else {
             println("Found ${solutions.size} solutions")
 

@@ -2,6 +2,8 @@ package bricktiler.board
 
 import bricktiler.Solution
 import bricktiler.dlx.SparseMatrix
+import java.lang.Math.abs
+import kotlin.math.absoluteValue
 
 // TODO these two data classes could be combined a little more neatly
 data class PiecePosition(
@@ -14,7 +16,7 @@ object BoardUtils {
     /**
      * @param includeInvalidRows If false, rows that have no columns matching the desired solution won't be added to the matrix at all.
      */
-    fun makeSparseMatrix(desiredSolution: List<Int>, board: Board, pieces: List<Pair<Piece, Int>>, includeInvalidRows: Boolean = true): Pair<SparseMatrix, List<PiecePosition>> {
+    fun makeSparseMatrix(desiredSolution: List<Int>, board: Board, pieces: List<Pair<Piece, Int>>, includeInvalidRows: Boolean = true, maxPerPieceError: Double = 0.0): Pair<SparseMatrix, List<PiecePosition>> {
         val sparseMatrix = SparseMatrix(desiredSolution)
         val piecePositions: MutableList<PiecePosition> = mutableListOf()
         var row = 0
@@ -23,7 +25,7 @@ object BoardUtils {
             piece.getAllValidTopLeftPositions(board).forEach { topLeft ->
                 val covering = piece.topLeftToPieceCovering(topLeft, board)
 
-                if (includeInvalidRows || covering.all { position -> desiredSolution[position] == value }){
+                if (includeInvalidRows || errorIsWithinBounds(covering, desiredSolution, value, maxPerPieceError)){
                     val piecePosition = PiecePosition(piece, topLeft, value)
                     piecePositions.add(piecePosition)
                     covering.forEach { position ->
@@ -34,7 +36,16 @@ object BoardUtils {
             }
         }
 
+        if (sparseMatrix.headers.any { it.first == null}) {
+            throw Exception("Impossible to generate a problem space with the given error threshold")
+        }
+
         return sparseMatrix to piecePositions
+    }
+
+    fun errorIsWithinBounds(covering: List<Int>, desiredValues: List<Int>, value: Int, maxPerPieceError: Double): Boolean {
+        val error = covering.sumOf { position -> value - desiredValues[position] }.absoluteValue
+        return error <= maxPerPieceError
     }
 
     fun describeSolution(solution: Solution, board: Board, piecePositions: List<PiecePosition>) =

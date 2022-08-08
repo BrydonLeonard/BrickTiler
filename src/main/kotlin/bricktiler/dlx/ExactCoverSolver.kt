@@ -2,9 +2,12 @@ package bricktiler.dlx
 
 import bricktiler.Solution
 import bricktiler.board.PiecePosition
+import bricktiler.dlx.ExactCoverSolver.statTracker.deadEnds
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
+import java.util.concurrent.BlockingQueue
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.abs
 
 
@@ -49,7 +52,11 @@ object ExactCoverSolver {
 
         coroutineScope {
             val deferredSolutions = mutableListOf<Job>()
-            val solutionChannel = Channel<List<Solution>>(50)
+            val solutionChannel = Channel<List<Solution>>()
+
+            if (headerWithFewestOnes.nodes.size == 0) {
+                deadEnds.incrementAndGet()
+            }
 
             for ((row, node) in headerWithFewestOnes.nodes.entries) {
                 if (node.covered) {
@@ -99,7 +106,7 @@ object ExactCoverSolver {
                         }
                     )
                 } else {
-                    val subSolutions = solve(matrix, config, depth + 1, currentSolution)
+                    val subSolutions = solve(matrix, config, depth + 1, currentSolution, validator)
 
                     solutions.addAll(subSolutions)
                 }
@@ -115,6 +122,7 @@ object ExactCoverSolver {
                 config.constraintValidator.removeRowFromSolution(node.row, currentSolution)
 
                 if (solutions.size > 0 && config.exitOnFirstSolution) {
+                    println("${coroutineContext.job.toString()} (depth: $depth) - Got ${solutions.size} solutions")
                     // Break out. We have what we need
                     break
                 }
@@ -122,27 +130,47 @@ object ExactCoverSolver {
 
             // If we're only looking for one solution, listen to the channel until it arrives, take it and GTFO.
             if (deferredSolutions.size > 0) {
-                var done = false
-                // While there are still jobs running
-                while (!done) {
-                    val nextSolutions = solutionChannel.receive()
-                    if (nextSolutions.isNotEmpty()) {
+                println("${coroutineContext.job.toString()} (depth: $depth)- Going to check for deferred solutions")
+                if (solutions.size > 0 && config.exitOnFirstSolution) {
+                    println("${coroutineContext.job.toString()} (depth: $depth) - Already got a solution, so cancelling unfinished jobs")
+                    deferredSolutions.forEach { it.cancel() }
+                } else {
+                    var done = false
+                    // While there are still jobs running
+                    while (!done && isActive) {
+                        yield()
+                        println("${coroutineContext.job.toString()} (depth: $depth) - Waiting to receive")
+                        val nextSolutions = solutionChannel.receive()
+                        println("${coroutineContext.job.toString()} (depth: $depth) - Received!")
                         solutions.addAll(nextSolutions)
 
-                        if (config.exitOnFirstSolution) {
+                        if (config.exitOnFirstSolution && nextSolutions.isNotEmpty()) {
+                            println("${coroutineContext.job.toString()} (depth: $depth) - Cancelling unfinished jobs")
+                            solutionChannel.close()
                             deferredSolutions.forEach { it.cancel() }
-                            break
+                            println("${coroutineContext.job.toString()} (depth: $depth) - Done cancelling")
+                            done = true
                         }
-                    }
 
-                    if (deferredSolutions.count { it.isActive } <= 0 && solutionChannel.isEmpty) {
-                        done = true
+                        if (deferredSolutions.count { it.isActive } <= 0 && solutionChannel.isEmpty) {
+                            solutionChannel.close()
+                            deferredSolutions.forEach { it.cancel() }
+                            done = true
+                        }
+                        println("${coroutineContext.job.toString()} (depth: $depth) - Still waiting for ${deferredSolutions.count { it.isActive } }. Done = $done, isActive = $isActive")
                     }
                 }
             }
+
+            println("${coroutineContext.job.toString()} (depth: $depth) - Outer - Still waiting for ${deferredSolutions.count { it.isActive } }. isActive = $isActive")
+
         }
 
         return solutions
+    }
+
+    object statTracker {
+        val deadEnds = AtomicInteger(0)
     }
 
     private fun hasNoErrors(startingNode: Node): Boolean {

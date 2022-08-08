@@ -10,7 +10,7 @@ class BoardUtilsTest {
     @Test
     fun `can generate a small matrix`() {
         val board = Board(1, 2)
-        val sparseMatrix = BoardUtils.makeSparseMatrix(List(16) { 1 }, board, listOf(Pair(Piece(1, 2), 1))).first
+        val sparseMatrix = BoardUtils.makeSparseMatrix(List(2) { 1 }, board, listOf(Pair(Piece(1, 2), 1))).first
 
         val expectedMatrix = listOf(
                 listOf(1, 1)
@@ -65,21 +65,15 @@ class BoardUtilsTest {
     }
 
     @Test
-    fun `can generate a sparse matrix while excluding invalid rows`() {
+    fun `throws an exception if a problem space can't be generated`() {
         val board = Board(3, 3)
-        val desiredSolution = listOf(1, 2, 1, 1, 2, 1, 2, 1, 2)
-        val sparseMatrix = BoardUtils.makeSparseMatrix(desiredSolution, board, listOf(Pair(Piece(1, 2), 1)), false).first
-
-        val expectedMatrix = mutableListOf(
-                mutableListOf(1, 0, 0, 1, 0, 0, 0, 0, 0),
-                mutableListOf(0, 0, 1, 0, 0, 1, 0, 0, 0),
+        val desiredSolution = listOf(
+            1, 2, 1,
+            1, 2, 1,
+            2, 1, 2
         )
-
-        expectedMatrix.forEachIndexed { rowIndex, row ->
-            row.forEachIndexed { columnIndex, value ->
-                val expectValue = value == 1
-                assertTrue(expectValue == (sparseMatrix.headers[columnIndex].getNodeInRow(rowIndex) != null), "Mismatch in row $rowIndex, column $columnIndex")
-            }
+        assertThrows(Exception::class.java) {
+            BoardUtils.makeSparseMatrix(desiredSolution, board, listOf(Pair(Piece(1, 2), 1)), false).first
         }
     }
 
@@ -101,6 +95,37 @@ class BoardUtilsTest {
             )
         )
 
+    }
+
+    @Test
+    fun `includes the correct pieces when accounting for error thresholds`() {
+        val board = Board(3, 3)
+        val desiredSolution = listOf(
+            1, 1, 2,
+            1, 2, 1,
+            2, 2, 2)
+        val piecePositions = BoardUtils.makeSparseMatrix(desiredSolution, board, listOf(Pair(Piece(1, 2), 1), Pair(Piece(2, 1), 1), Pair(Piece(1, 2), 2)), false, 1).second
+
+        assertThat(
+            piecePositions,
+            containsInAnyOrder(
+                PiecePosition(Piece(1, 2), 0, 1),
+                PiecePosition(Piece(1, 2), 1, 1),
+                PiecePosition(Piece(1, 2), 2, 1),
+                PiecePosition(Piece(1, 2), 3, 1),
+                PiecePosition(Piece(1, 2), 5, 1),
+                PiecePosition(Piece(2, 1), 0, 1),
+                PiecePosition(Piece(2, 1), 1, 1),
+                PiecePosition(Piece(2, 1), 3, 1),
+                PiecePosition(Piece(2, 1), 4, 1),
+
+                PiecePosition(Piece(1, 2), 1, 2),
+                PiecePosition(Piece(1, 2), 2, 2),
+                PiecePosition(Piece(1, 2), 3, 2),
+                PiecePosition(Piece(1, 2), 4, 2),
+                PiecePosition(Piece(1, 2), 5, 2),
+            )
+        )
     }
 
     @Test
