@@ -1,9 +1,7 @@
 package bricktiler.dlx
 
 import bricktiler.Solution
-import bricktiler.board.Piece
 import bricktiler.board.PiecePosition
-import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * TODO: Would be nice to bump over to a sealed interface

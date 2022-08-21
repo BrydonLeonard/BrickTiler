@@ -1,5 +1,9 @@
 package bricktiler.dlx
 
+import bricktiler.Logger.Companion.logger
+import bricktiler.dlx.Header.Companion.globalOpCounter
+import java.util.*
+
 class Node(val header: Header, val row: Int, val value: Int) {
     var up: Node = this
         private set
@@ -15,17 +19,41 @@ class Node(val header: Header, val row: Int, val value: Int) {
      */
     var covered: Boolean = false
         private set
+    var marker: Boolean = false
 
-    fun cover() {
+    val ops = Stack<String>()
+
+    fun cover(id: String) {
+        if (this.covered) {
+            println("EVEN WORSE")
+        }
         this.up.down = this.down
+        val op = globalOpCounter.incrementAndGet()
+        logger.log("[$id] [${this.header.id}] [$op] [Col ${header.column}] [$this] Hid ${this.row} from ${this.up.row} above")
+        ops.add("[$id] [${this.header.id}] [$op] [Col ${header.column}] [$this] Hid ${this.row} from ${this.up.row} above")
         this.down.up = this.up
+        logger.log("[$id] [${this.header.id}] [$op] [Col ${header.column}] [$this] Hid ${this.row} from ${this.down.row} below")
+        ops.add(("[$id] [${this.header.id}] [$op] [Col ${header.column}] [$this] Hid ${this.row} from ${this.down.row} below"))
         this.covered = true
+
+
+        if ((this.up.covered || this.down.covered)) {
+            this.marker = true
+        }
     }
 
-    fun uncover() {
+    fun uncover(id: String) {
         this.up.down = this
+        val op = globalOpCounter.incrementAndGet()
+        this.header.matrix.saveStateWithId("$op-uncover-before")
+        logger.log("[$id] [${this.header.id}] [$op] [Col ${header.column}] [$this] Revealed ${this.row} to ${this.up.row} above")
+        ops.add(("[$id] [${this.header.id}] [$op] [Col ${header.column}] [$this] Revealed ${this.row} to ${this.up.row} above"))
         this.down.up = this
+        logger.log("[$id] [${this.header.id}] [$op] [Col ${header.column}] [$this] Revealed ${this.row} to ${this.down.row} below")
+        ops.add("[$id] [${this.header.id}] [$op] [Col ${header.column}] [$this] Revealed ${this.row} to ${this.down.row} below")
         this.covered = false
+        this.header.matrix.saveStateWithId("$op-uncover-after")
+
     }
 
     fun addUp(node: Node) {
@@ -46,5 +74,29 @@ class Node(val header: Header, val row: Int, val value: Int) {
     fun addRight(node: Node) {
         this.right = node
         node.left = this
+    }
+
+    val shortName: String = this.toString().split("@")[1]
+
+    fun asPumlState(qualifier: String?): String {
+        val lines = mutableListOf<String>()
+        lines.let {
+            it.add("state $shortName" + (qualifier ?: ""))
+            it.add("$shortName:(${this.header.column},${this.row})")
+            if (this.up != this) {
+                it.add("$shortName -u-> ${this.up.shortName}")
+            }
+            if (this.down != this) {
+                it.add("$shortName -d-> ${this.down.shortName}")
+            }
+            if (this.left != this) {
+                //it.add("$shortName -l-> ${this.left.shortName}")
+            }
+            if (this.right != this) {
+                //it.add("$shortName -r-> ${this.right.shortName}")
+            }
+        }
+
+        return lines.joinToString("\n")
     }
 }

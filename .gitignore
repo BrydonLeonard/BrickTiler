@@ -2,3 +2,6 @@
 build/
 .gradle/
 *.hprof
+vis/
+*.txt
+*.puml

@@ -1,6 +1,12 @@
 package bricktiler.dlx
 
-class Header(val column: Int, val desiredValue: Int = 1) {
+import java.io.File
+import java.util.*
+import java.util.concurrent.atomic.AtomicInteger
+import kotlin.collections.HashMap
+
+// Keep a ref back to the matrix for convenience sake while debugging
+class Header(val column: Int, val matrix: SparseMatrix, val desiredValue: Int = 1) {
     var first: Node? = null
         private set
     var last: Node? = null
@@ -15,6 +21,8 @@ class Header(val column: Int, val desiredValue: Int = 1) {
     var count: Int = 0
         private set
 
+    val id = UUID.randomUUID().toString()
+
     /**
      * Mapping of row index: node
      * TODO: Should be private
@@ -24,39 +32,45 @@ class Header(val column: Int, val desiredValue: Int = 1) {
     /**
      * Covers this column and all rows in which it has a value
      */
-    fun cover() {
+    fun cover(id: String) {
         covered = true
         this.left.right = this.right
         this.right.left = this.left
 
         // Moves down the column to cover rows with 1s
         var rowNode = first
+        var count = 0
 
-        while (rowNode != last && rowNode != null) {
-            coverRow(rowNode)
+        while ((rowNode != first || count < 1) && rowNode != null) {
+            count++
+            if (count % 100 == 0) {
+                println("We've hit $count!")
+            }
+            coverRow(rowNode, id)
             rowNode = rowNode.down
         }
-
-        coverRow(rowNode)
     }
 
     /**
      * The exact opposite of [cover] (including the order in which uncovering happens)
      */
-    fun uncover() {
+    fun uncover(id: String) {
         covered = false
         this.right.left = this
         this.left.right = this
 
-        var rowNode = last
+        var rowNode = last?.up
 
         // TODO sometimes this runs infinitely
-        while (rowNode != first && rowNode != null) {
-            uncoverRow(rowNode)
+        while (rowNode != last && rowNode != null) {
+            if (rowNode.covered) {
+                println("Node is covered somehow")
+            }
+            uncoverRow(rowNode, id)
             rowNode = rowNode.up
         }
 
-        uncoverRow(rowNode)
+        uncoverRow(rowNode, id)
     }
 
     /**
@@ -92,13 +106,14 @@ class Header(val column: Int, val desiredValue: Int = 1) {
     /**
      * Will cover all nodes in the row _except_ the one passed in as an argument
      */
-    fun coverRow(startingNode: Node?) {
+    fun coverRow(startingNode: Node?, id: String) {
         startingNode ?: return
 
         var node = startingNode.right
 
         while (node != startingNode) {
-            node.cover()
+            node.cover(id)
+
             node.header.count--
 
             // All this nonsense because I didn't want special header nodes
@@ -115,6 +130,17 @@ class Header(val column: Int, val desiredValue: Int = 1) {
                 }
             }
 
+            var rowNode = node.header.first
+            var loopCount = 0
+
+            while ((rowNode != node.header.first || loopCount < 1) && rowNode != null) {
+                loopCount++
+                if (loopCount % 100 == 0 && loopCount > 0) {
+                    println("We've hit $loopCount!")
+                }
+                rowNode = rowNode.down
+            }
+
             node = node.right
         }
     }
@@ -122,7 +148,7 @@ class Header(val column: Int, val desiredValue: Int = 1) {
     /**
      * Will uncover all nodes in the given row _except_ the one provided as an arugment
      */
-    fun uncoverRow(startingNode: Node?) {
+    fun uncoverRow(startingNode: Node?, id: String) {
         startingNode ?: return
 
         if (startingNode.header != this) {
@@ -132,7 +158,7 @@ class Header(val column: Int, val desiredValue: Int = 1) {
         var node = startingNode.left
 
         while (node != startingNode) {
-            node.uncover()
+            node.uncover(id)
             node.header.count++
 
             // Null [first] means that there's nothing else uncovered currently. The uncovering node will become first and last
@@ -148,6 +174,26 @@ class Header(val column: Int, val desiredValue: Int = 1) {
                 if (node.up == node.header.last && node.up.row < node.row) {
                     node.header.last = node
                 }
+            }
+            var rowNode = node.header.first
+            var loopCount = 0
+
+            val previouslySeen = HashSet<Node>()
+            var foundLoop = false
+
+            while ((rowNode != node.header.first || loopCount < 1) && rowNode != null && node.down != node) {
+                if (!previouslySeen.add(rowNode) && !foundLoop) {
+                    println("Loop is at ${rowNode.row}")
+                    println("Dumping visualisation")
+
+                    File("pumlVis.puml").writeText(matrix.pumlCompatibleVisualisation(node.header.column))
+                    foundLoop = true
+                }
+                loopCount++
+                if (loopCount % 100 == 0 && loopCount > 0) {
+                    println("We've hit $loopCount!")
+                }
+                rowNode = rowNode.down
             }
 
             node = node.left
@@ -207,5 +253,9 @@ class Header(val column: Int, val desiredValue: Int = 1) {
 
             header = header.right
         }
+    }
+
+    companion object {
+        val globalOpCounter = AtomicInteger(0)
     }
 }

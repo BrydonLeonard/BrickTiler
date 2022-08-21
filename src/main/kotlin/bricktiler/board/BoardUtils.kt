@@ -2,7 +2,6 @@ package bricktiler.board
 
 import bricktiler.Solution
 import bricktiler.dlx.SparseMatrix
-import java.lang.Math.abs
 import kotlin.math.absoluteValue
 
 // TODO these two data classes could be combined a little more neatly
@@ -21,7 +20,7 @@ object BoardUtils {
         val piecePositions: MutableList<PiecePosition> = mutableListOf()
         var row = 0
 
-        pieces.forEach { (piece, value) ->
+        pieces.shuffled().forEach { (piece, value) ->
             piece.getAllValidTopLeftPositions(board).forEach { topLeft ->
                 val covering = piece.topLeftToPieceCovering(topLeft, board)
 
@@ -44,8 +43,20 @@ object BoardUtils {
     }
 
     fun errorIsWithinBounds(covering: List<Int>, desiredValues: List<Int>, value: Int, maxPerPieceError: Double): Boolean {
-        val error = covering.sumOf { position -> value - desiredValues[position] }.absoluteValue
-        return error <= maxPerPieceError
+        val adjustedMaxError = when(covering.size) {
+            2 -> maxPerPieceError
+            4 -> maxPerPieceError
+            6 -> maxPerPieceError
+            8 -> 2 * maxPerPieceError
+            else -> 0
+        }
+
+        val calc1 = { position: Int -> if ((value - desiredValues[position]).absoluteValue > 0) 1.0 else 0.0 }
+        val calc2 = { position: Int -> (value - desiredValues[position]).absoluteValue }
+        val calc3 = { position: Int -> (value - desiredValues[position]) }
+
+        val error = covering.sumOf(calc1)
+        return error <= adjustedMaxError.toDouble()
     }
 
     fun describeSolution(solution: Solution, board: Board, piecePositions: List<PiecePosition>) =

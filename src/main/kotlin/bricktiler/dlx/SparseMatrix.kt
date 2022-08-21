@@ -1,6 +1,7 @@
 package bricktiler.dlx
 
 import bricktiler.board.PiecePosition
+import java.io.File
 
 /**
  * If I felt like _thinking_, I could make the column count flexible, but it's much easier to just start with a known
@@ -23,7 +24,7 @@ class SparseMatrix private constructor(val width: Int, private val desiredValues
 
     init {
         if (width > 0) {
-            firstCol = Header(0, desiredValues[0])
+            firstCol = Header(0, this, desiredValues[0])
             headers = mutableListOf(firstCol!!)
             uncoveredHeaders = mutableSetOf(firstCol!!)
         } else {
@@ -33,7 +34,7 @@ class SparseMatrix private constructor(val width: Int, private val desiredValues
         }
         // Since the list is circular, adding to the left of the first element is the same as adding to the end. Neat
         repeat(width - 1) {
-            val newHeader = Header(it + 1, desiredValues[it + 1])
+            val newHeader = Header(it + 1, this, desiredValues[it + 1])
             firstCol!!.left.addRight(newHeader)
             firstCol!!.addLeft(newHeader)
             headers.add(newHeader)
@@ -70,8 +71,8 @@ class SparseMatrix private constructor(val width: Int, private val desiredValues
         return minHeader
     }
 
-    fun coverColumn(header: Header) {
-        header.cover()
+    fun coverColumn(header: Header, id: String) {
+        header.cover(id)
         if (header == firstCol && firstCol != null) {
             firstCol = firstCol!!.right
             while (firstCol!!.covered && header != firstCol) {
@@ -81,8 +82,8 @@ class SparseMatrix private constructor(val width: Int, private val desiredValues
         uncoveredHeaders.remove(header)
     }
 
-    fun uncoverColumn(header: Header) {
-        header.uncover()
+    fun uncoverColumn(header: Header, id: String) {
+        header.uncover(id)
         while (firstCol != null && firstCol!!.covered) {
             firstCol = firstCol!!.left
         }
@@ -148,6 +149,74 @@ class SparseMatrix private constructor(val width: Int, private val desiredValues
         }
 
         return string
+    }
+
+    enum class NodeBadness(val qualifier: String) {
+        BAD("#red"),
+        COVERED("#gray"),
+        FIRST("<<first>>"),
+        LAST("<<last>>")
+    }
+
+    fun pumlCompatibleVisualisation(badColumn: Int? = null, title: String? = null) = headers.mapIndexed { index, col ->
+        val colStrings = mutableListOf<String>()
+
+        col.nodes.forEach { (_, node) ->
+            val qualifier = if (node.covered) {
+                NodeBadness.COVERED.qualifier
+            } else {
+                null
+            }
+            val preQual = when {
+                node.header.first == node -> NodeBadness.FIRST.qualifier
+                node.header.last == node -> NodeBadness.LAST.qualifier
+                else -> ""
+            }
+            colStrings.add(node.asPumlState("${preQual}${qualifier ?: ""}"))
+        }
+
+        col to colStrings.joinToString("\n")
+    }.mapIndexed { index, (header, colString) ->
+        val qualifier = when {
+            header.column == badColumn -> "#${NodeBadness.BAD.qualifier}"
+            header.covered -> "#${NodeBadness.COVERED.qualifier}"
+            else -> ""
+        }
+
+        val colState = """
+                state col$index$qualifier {
+                    $colString
+                }
+            """.trimIndent()
+
+        val lines = mutableListOf<String>(colState)
+        if (index == 0) {
+            lines.add("[*] -r-> col0")
+        }
+        if (index == headers.size - 1) {
+            lines.add("col$index -r-> [*]")
+        }
+        if (headers.size != 1 && index != 0) {
+            lines.add("col${index - 1} -r-> col$index")
+        }
+        lines.joinToString("\n")
+    }.joinToString("\n\n")
+        .let {
+            """
+                @startuml
+                ${title?.let { "title $title" } ?: ""}
+                skinparam state {
+                  FontColor<<first>> Blue
+                  FontColor<<last>> Red
+                }
+                $it
+                @enduml
+            """.trim()
+        }
+
+
+    fun saveStateWithId(id: String) {
+        File("./vis/$id.puml").writeText(pumlCompatibleVisualisation(title = "$id: ${Header.globalOpCounter.get()}"))
     }
 
     private fun columnCycles(header: Header): Boolean {

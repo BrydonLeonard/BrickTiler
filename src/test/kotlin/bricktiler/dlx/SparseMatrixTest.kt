@@ -154,14 +154,6 @@ class SparseMatrixTest {
 
     @Test()
     fun `lots of covering and uncovering to make sure it all works`() {
-        /*
-            0	0	0	1	0	0	0
-            0	1	0	1	1	0	0
-            1	1	1	1	1	1	1
-            1	0	1	0	1	0	0
-            0	0	1	0	0	0	0
-         */
-
         val matrix = SparseMatrix(200)
 
         val claimedCells = mutableSetOf<Pair<Int, Int>>()
@@ -191,6 +183,86 @@ class SparseMatrixTest {
 
         while (latest >= 0) {
             matrix.headers[latest--].uncover()
+        }
+    }
+
+    @Nested
+    inner class ShortestUncoveredColumn {
+        @Test
+        fun `works in an uncovered matrix`() {
+            val matrix = SparseMatrix(3)
+            /*
+            1 0 0
+            1 1 0
+            1 1 0
+            0 1 1
+            0 0 1
+             */
+            matrix.add(0,0, 1)
+            matrix.add(0, 2, 1)
+            matrix.add(1, 1, 1)
+            matrix.add(1, 2, 1)
+            matrix.add(1, 3, 1)
+            matrix.add(2, 3, 1)
+
+            val shortestUncoveredColumn = matrix.shortestUncoveredColumn()
+
+            assertEquals(2, shortestUncoveredColumn!!.column)
+        }
+
+        @Test
+        fun `works in matrix with the previously shortest row covered`() {
+            val matrix = SparseMatrix(3)
+            /*
+            1 0 0
+            0 1 0
+            1 1 0
+            0 1 1
+            0 0 1
+             */
+            matrix.add(0,0, 1)
+            matrix.add(0, 2, 1)
+            matrix.add(1, 1, 1)
+            matrix.add(1, 2, 1)
+            matrix.add(1, 3, 1)
+            matrix.add(2, 3, 1)
+
+            matrix.headers[2].cover()
+
+            val shortestUncoveredColumn = matrix.shortestUncoveredColumn()
+
+            // Both uncovered columns will now have 2 non-zero values. The  first should be chosen
+            assertEquals(0, shortestUncoveredColumn!!.column)
+        }
+
+        @Test
+        fun `if a column with no non zero value exists, it is returned`() {
+            val matrix = SparseMatrix(4)
+            /*
+            1 0 0 0
+            0 1 0 0
+            0 1 0 0
+            0 0 1 1
+            0 0 1 1
+             */
+            matrix.add(0,0, 1)
+            matrix.add(1, 1, 1)
+            matrix.add(1, 2, 1)
+            matrix.add(2, 3, 1)
+            matrix.add(2, 4, 1)
+            matrix.add(3, 3, 1)
+            matrix.add(3, 4, 1)
+
+            matrix.headers[3].cover()
+
+            val shortestUncoveredColumn = matrix.shortestUncoveredColumn()
+
+            matrix.headers.forEach {
+                println("${it.column}: ${it.count}")
+            }
+
+            // The third column has more non-zero values, but they're all covered.
+            assertEquals(2, shortestUncoveredColumn!!.column)
         }
     }
 
@@ -280,7 +352,7 @@ class SparseMatrixTest {
         }
     }
 
-    private fun buildMatrix(): SparseMatrix {
+    fun buildMatrix(): SparseMatrix {
         /*
         Builds a matrix that looks like:
             1 0 0 0 4

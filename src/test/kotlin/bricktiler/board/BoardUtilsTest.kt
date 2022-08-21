@@ -104,7 +104,7 @@ class BoardUtilsTest {
             1, 1, 2,
             1, 2, 1,
             2, 2, 2)
-        val piecePositions = BoardUtils.makeSparseMatrix(desiredSolution, board, listOf(Pair(Piece(1, 2), 1), Pair(Piece(2, 1), 1), Pair(Piece(1, 2), 2)), false, 1).second
+        val piecePositions = BoardUtils.makeSparseMatrix(desiredSolution, board, listOf(Pair(Piece(1, 2), 1), Pair(Piece(2, 1), 1), Pair(Piece(1, 2), 2)), false, 1.0).second
 
         assertThat(
             piecePositions,

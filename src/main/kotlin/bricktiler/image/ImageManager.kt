@@ -8,7 +8,6 @@ import ij.IJ
 import ij.ImagePlus
 import ij.process.ColorProcessor
 import ij.process.ImageConverter
-import ij.process.ImageProcessor
 import java.awt.Color
 
 class ImageManager private constructor(val image: ImagePlus) {
@@ -43,7 +42,7 @@ class ImageManager private constructor(val image: ImagePlus) {
             System.setProperty("java.version", "1.8")
         }
 
-        fun downscaleFromFile(width: Int, height: Int, colourCount: Int, imagePath: String = "C:/Users/user-pc/Desktop/headpon.png"): ImageManager {
+        fun downscaleFromFile(width: Int, height: Int, colourCount: Int, imagePath: String = "C:/Users/user-pc/Desktop/roll.jpg"): ImageManager {
             setupEnv()
 
             val imp = IJ.openImage(imagePath)
@@ -56,15 +55,35 @@ class ImageManager private constructor(val image: ImagePlus) {
                 convertRGBtoIndexedColor(colourCount)
             }
 
+            val downscaledWithContrast = IJ.createImage("Foo", "RGB", downscaled.width, downscaled.height, 32)
+
+            val colorMapping: Map<Int, Color> = mapOf(
+                1 to Color(50, 50, 50),
+                2 to Color(100, 100, 100),
+                3 to Color(150, 150, 150),
+                4 to Color(200, 200, 200)
+            )
+
+            ColorProcessor(downscaledWithContrast.image).also { colorProcessor ->
+                repeat(height) { y ->
+                    repeat(width) { x ->
+                        colorProcessor.setColor(colorMapping[downscaled.getPixel(x, y)[0] + 1])
+                        colorProcessor.drawPixel(x, y)
+                    }
+                }
+            }
+
+            ImagePlus("huh?", downscaledWithContrast.image.getScaledInstance(width * 10, height * 10, 0)).show()
+
             return ImageManager(downscaled)
         }
 
         fun fromSolution(solution: Solution, board: Board, piecePositions: List<PiecePosition>,
                          colorMapping: Map<Int, Color> = mapOf(
-                             1 to Color.BLACK,
-                             2 to Color.DARK_GRAY,
-                             3 to Color.LIGHT_GRAY,
-                             4 to Color.WHITE
+                             1 to Color(50, 50, 50),
+                             2 to Color(100, 100, 100),
+                             3 to Color(150, 150, 150),
+                             4 to Color(200, 200, 200)
                          )): ImageManager {
             setupEnv()
 

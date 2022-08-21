@@ -1,12 +1,23 @@
 package bricktiler.dlx
 
 import bricktiler.Solution
-import bricktiler.board.PiecePosition
+import bricktiler.dlx.ExactCoverSolver.statTracker.badRowsDueToConstraints
+import bricktiler.dlx.ExactCoverSolver.statTracker.badRowsDueToCovered
+import bricktiler.dlx.ExactCoverSolver.statTracker.badRowsDueToError
+import bricktiler.dlx.ExactCoverSolver.statTracker.deadEndDueToConstraints
 import bricktiler.dlx.ExactCoverSolver.statTracker.deadEnds
+import bricktiler.dlx.ExactCoverSolver.statTracker.depthCount
+import bricktiler.dlx.ExactCoverSolver.statTracker.down
+import bricktiler.dlx.ExactCoverSolver.statTracker.maxDepth
+import bricktiler.dlx.ExactCoverSolver.statTracker.solutions
+import bricktiler.dlx.ExactCoverSolver.statTracker.up
+import bricktiler.dlx.Header.Companion.globalOpCounter
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
-import java.util.concurrent.BlockingQueue
-import java.util.concurrent.atomic.AtomicBoolean
+import java.io.File
+import java.util.*
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.abs
 
@@ -42,34 +53,74 @@ public data class SolutionConfig(
 
 object ExactCoverSolver {
 
+    fun solveOnce(matrix: SparseMatrix, config: SolutionConfig, dispatcher: CoroutineDispatcher): Solution? {
+        var solution: Solution? = null
+        runBlocking(dispatcher) {
+            val channel = Channel<Solution?>(100, BufferOverflow.DROP_LATEST)
+
+            launch(dispatcher) {
+                try {
+                    println("Starting solver")
+                    solve(matrix, config, channel)
+                } catch (e: Exception) {
+                    println(e)
+                }
+                println("Solver complete")
+                channel.send(null)
+            }
+
+            println("Solver running")
+            solution = channel.receive()
+            println("Received")
+            coroutineContext.cancelChildren()
+        }
+        return solution
+    }
+
     /**
      * @param overridingValidator allows the validator in [config] to be overriden at any point
      */
-    suspend fun solve(matrix: SparseMatrix, config: SolutionConfig = SolutionConfig(), depth: Int = 0, currentSolution: Solution = Solution(), overridingValidator: ConstraintValidator? = null): List<Solution> {
-        val headerWithFewestOnes = matrix.shortestUncoveredColumn() ?: return listOf(currentSolution.clone())
+    suspend fun solve(matrix: SparseMatrix, config: SolutionConfig = SolutionConfig(), channel: Channel<Solution?>, depth: Int = 0, currentSolution: Solution = Solution(), overridingValidator: ConstraintValidator? = null, id: String = "") {
+        matrix.saveStateWithId("${id}_${globalOpCounter.get()}")
+        depthCount.compute(depth) { _, value -> (value ?: 0) + 1 }
+        maxDepth.updateAndGet { current -> if (current > depth) current else depth }
+        val headerWithFewestOnes = matrix.shortestUncoveredColumn()
+        if (headerWithFewestOnes == null) {
+            channel.send(currentSolution.clone())
+            solutions.incrementAndGet()
+            up.incrementAndGet()
+            return
+        }
 
-        val solutions = mutableListOf<Solution>()
+        val subRoutines = AtomicInteger(0)
 
         coroutineScope {
+            yield()
             val deferredSolutions = mutableListOf<Job>()
-            val solutionChannel = Channel<List<Solution>>()
 
             if (headerWithFewestOnes.nodes.size == 0) {
                 deadEnds.incrementAndGet()
             }
 
+            var constraintDrops = 0
+
             for ((row, node) in headerWithFewestOnes.nodes.entries) {
+                matrix.saveStateWithId("${id}_${globalOpCounter.get()}_${row}_start")
+                yield()
                 if (node.covered) {
+                    badRowsDueToCovered.incrementAndGet()
                     continue
                 }
 
                 // TODO: Speed up error calculation
                 when (config.errorChecking) {
                     ErrorChecking.ONLY_EXACT -> if (!hasNoErrors(node)) {
+                        badRowsDueToError.incrementAndGet()
                         continue
                     }
 
                     ErrorChecking.ALLOW_ERRORS -> if (calculateError(node, config) > config.maxPerPieceError) {
+                        badRowsDueToError.incrementAndGet()
                         continue
                     }
 
@@ -79,98 +130,75 @@ object ExactCoverSolver {
                 val validator = overridingValidator ?: config.constraintValidator
 
                 if (!validator.addRowToSolution(row, currentSolution)) {
+                    badRowsDueToConstraints.incrementAndGet()
+                    constraintDrops++
                     continue
                 }
 
                 var iterNode = node.right
 
                 while (iterNode != node) {
-                    matrix.coverColumn(iterNode.header)
+                    yield()
+                    matrix.coverColumn(iterNode.header, id)
                     iterNode = iterNode.right
                 }
-                matrix.coverColumn(node.header)
+                matrix.coverColumn(node.header, id)
+                matrix.saveStateWithId("${id}_${globalOpCounter.get()}_${row}_covered")
 
                 if (depth < config.maxRecursiveDepth) {
                     val clonedMatrix = matrix.cloneUncovered()
                     val clonedSolution = currentSolution.clone()
+                    val validator = config.constraintValidator.clone()
                     deferredSolutions.add(
                         launch {
-                            val solutionSet = solve(
+                            down.incrementAndGet()
+                            solve(
                                 clonedMatrix,
                                 config,
+                                channel,
                                 depth + 1,
                                 clonedSolution,
-                                config.constraintValidator.clone()
+                                validator,
+                                "$id-${subRoutines.getAndIncrement()}"
                             )
-                            solutionChannel.send(solutionSet)
                         }
                     )
                 } else {
-                    val subSolutions = solve(matrix, config, depth + 1, currentSolution, validator)
-
-                    solutions.addAll(subSolutions)
+                    down.incrementAndGet()
+                    solve(matrix, config, channel, depth + 1, currentSolution, validator, id)
                 }
 
                 iterNode = node.left
 
                 while (iterNode != node) {
-                    matrix.uncoverColumn(iterNode.header)
+                    yield()
+                    matrix.uncoverColumn(iterNode.header, id)
                     iterNode = iterNode.left
                 }
-                matrix.uncoverColumn(node.header)
+                matrix.uncoverColumn(node.header, id)
+
+                matrix.saveStateWithId("${id}_${globalOpCounter.get()}_${row}_end")
 
                 config.constraintValidator.removeRowFromSolution(node.row, currentSolution)
-
-                if (solutions.size > 0 && config.exitOnFirstSolution) {
-                    println("${coroutineContext.job.toString()} (depth: $depth) - Got ${solutions.size} solutions")
-                    // Break out. We have what we need
-                    break
-                }
             }
-
-            // If we're only looking for one solution, listen to the channel until it arrives, take it and GTFO.
-            if (deferredSolutions.size > 0) {
-                println("${coroutineContext.job.toString()} (depth: $depth)- Going to check for deferred solutions")
-                if (solutions.size > 0 && config.exitOnFirstSolution) {
-                    println("${coroutineContext.job.toString()} (depth: $depth) - Already got a solution, so cancelling unfinished jobs")
-                    deferredSolutions.forEach { it.cancel() }
-                } else {
-                    var done = false
-                    // While there are still jobs running
-                    while (!done && isActive) {
-                        yield()
-                        println("${coroutineContext.job.toString()} (depth: $depth) - Waiting to receive")
-                        val nextSolutions = solutionChannel.receive()
-                        println("${coroutineContext.job.toString()} (depth: $depth) - Received!")
-                        solutions.addAll(nextSolutions)
-
-                        if (config.exitOnFirstSolution && nextSolutions.isNotEmpty()) {
-                            println("${coroutineContext.job.toString()} (depth: $depth) - Cancelling unfinished jobs")
-                            solutionChannel.close()
-                            deferredSolutions.forEach { it.cancel() }
-                            println("${coroutineContext.job.toString()} (depth: $depth) - Done cancelling")
-                            done = true
-                        }
-
-                        if (deferredSolutions.count { it.isActive } <= 0 && solutionChannel.isEmpty) {
-                            solutionChannel.close()
-                            deferredSolutions.forEach { it.cancel() }
-                            done = true
-                        }
-                        println("${coroutineContext.job.toString()} (depth: $depth) - Still waiting for ${deferredSolutions.count { it.isActive } }. Done = $done, isActive = $isActive")
-                    }
-                }
+            if (constraintDrops == headerWithFewestOnes.nodes.size) {
+                deadEndDueToConstraints.incrementAndGet()
             }
-
-            println("${coroutineContext.job.toString()} (depth: $depth) - Outer - Still waiting for ${deferredSolutions.count { it.isActive } }. isActive = $isActive")
-
         }
-
-        return solutions
+        up.incrementAndGet()
     }
 
     object statTracker {
         val deadEnds = AtomicInteger(0)
+        val solutions = AtomicInteger(0)
+        val maxDepth = AtomicInteger(0)
+        val depthCount = ConcurrentHashMap<Int, Int>()
+        val badRowsDueToConstraints = AtomicInteger(0)
+        val badRowsDueToError = AtomicInteger(0)
+        val badRowsDueToCovered = AtomicInteger(0)
+        val deadEndDueToConstraints = AtomicInteger(0)
+        val down = AtomicInteger(0)
+        val up = AtomicInteger(0)
     }
 
     private fun hasNoErrors(startingNode: Node): Boolean {

@@ -2,19 +2,24 @@ package bricktiler
 
 import bricktiler.board.*
 import bricktiler.dlx.*
+import bricktiler.dlx.ExactCoverSolver.statTracker.badRowsDueToConstraints
+import bricktiler.dlx.ExactCoverSolver.statTracker.badRowsDueToCovered
+import bricktiler.dlx.ExactCoverSolver.statTracker.badRowsDueToError
+import bricktiler.dlx.ExactCoverSolver.statTracker.deadEndDueToConstraints
 import bricktiler.dlx.ExactCoverSolver.statTracker.deadEnds
+import bricktiler.dlx.ExactCoverSolver.statTracker.down
+import bricktiler.dlx.ExactCoverSolver.statTracker.solutions
+import bricktiler.dlx.ExactCoverSolver.statTracker.up
 import bricktiler.image.ImageManager
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asCoroutineDispatcher
-import kotlinx.coroutines.runBlocking
+import java.io.File
 import java.util.concurrent.Executors
-import java.util.concurrent.atomic.AtomicInteger
 
 
 object BrickTiler {
     @JvmStatic
     fun main(args: Array<String>) {
-        val board = Board(32, 32)
+        val board = Board(3, 3)
         val image = ImageManager.downscaleFromFile(board.width, board.height, 4)
         val desiredSolution = image.asOneDimensionalArray().map { it + 1 }
 
@@ -76,35 +81,39 @@ object BrickTiler {
             .newFixedThreadPool(12)
             .asCoroutineDispatcher()
 
-        val solutions = runBlocking(dispatcher) {
-            ExactCoverSolver.solve(
-                sparseMatrix, config
-            ).also{
-                println("??")
-            }.toSet().toList()
+        File("initialState.puml").writeText(sparseMatrix.pumlCompatibleVisualisation())
 
-        }
+        val solution = ExactCoverSolver.solveOnce(
+            sparseMatrix, config, dispatcher
+        )
 
-        if (solutions.isEmpty()) {
+        if (solution == null) {
             println("No solutions :(")
             println("Found ${deadEnds} dead ends")
+            println("\"Found\" ${solutions} solutions")
+            println("Went to ${ExactCoverSolver.statTracker.maxDepth} max depth")
+            println("Visited each depth this many times:\n ${ExactCoverSolver.statTracker.depthCount}")
+            println("Drops:")
+            println("  Constraints: ${badRowsDueToConstraints}")
+            println("  Errors: ${badRowsDueToError}")
+            println("  Covered: ${badRowsDueToCovered}")
+            println("Dead ends due to constraints: ${deadEndDueToConstraints}")
+            println("Descended: ${down} times and ascended ${up} times")
         } else {
-            println("Found ${solutions.size} solutions")
+            println(BoardUtils.describeSolutionAsString(solution, board, piecePositions))
 
-            val randomSolution = solutions.first()
+            val solutionImage = ImageManager.fromSolution(solution, board, piecePositions)
 
-            println(BoardUtils.describeSolutionAsString(randomSolution, board, piecePositions))
-
-            val solutionImage = ImageManager.fromSolution(randomSolution, board, piecePositions)
-
-            val described = BoardUtils.describeSolution(randomSolution, board, piecePositions)
+            val described = BoardUtils.describeSolution(solution, board, piecePositions)
 
             described.entries.map { it.key }
 
             solutionImage.show(10)
+            image.show(20)
             println(solutionImage.toString())
-            println(summariseSolution(randomSolution, board, piecePositions))
+            println(summariseSolution(solution, board, piecePositions))
         }
+
     }
 
     fun summariseSolution(solution: Solution, board: Board, piecePositions: List<PiecePosition>) =
