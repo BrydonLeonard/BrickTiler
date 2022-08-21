@@ -178,8 +178,8 @@ class SparseMatrix private constructor(val width: Int, private val desiredValues
         col to colStrings.joinToString("\n")
     }.mapIndexed { index, (header, colString) ->
         val qualifier = when {
-            header.column == badColumn -> "#${NodeBadness.BAD.qualifier}"
-            header.covered -> "#${NodeBadness.COVERED.qualifier}"
+            header.column == badColumn -> "${NodeBadness.BAD.qualifier}"
+            header.covered -> "${NodeBadness.COVERED.qualifier}"
             else -> ""
         }
 

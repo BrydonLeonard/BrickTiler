@@ -27,14 +27,16 @@ class Node(val header: Header, val row: Int, val value: Int) {
         if (this.covered) {
             println("EVEN WORSE")
         }
-        this.up.down = this.down
         val op = globalOpCounter.incrementAndGet()
+        this.header.matrix.saveStateWithId("$id-$op-cover-pre")
+        this.up.down = this.down
         logger.log("[$id] [${this.header.id}] [$op] [Col ${header.column}] [$this] Hid ${this.row} from ${this.up.row} above")
         ops.add("[$id] [${this.header.id}] [$op] [Col ${header.column}] [$this] Hid ${this.row} from ${this.up.row} above")
         this.down.up = this.up
         logger.log("[$id] [${this.header.id}] [$op] [Col ${header.column}] [$this] Hid ${this.row} from ${this.down.row} below")
         ops.add(("[$id] [${this.header.id}] [$op] [Col ${header.column}] [$this] Hid ${this.row} from ${this.down.row} below"))
         this.covered = true
+        this.header.matrix.saveStateWithId("$id-$op-cover-post")
 
 
         if ((this.up.covered || this.down.covered)) {
@@ -43,17 +45,17 @@ class Node(val header: Header, val row: Int, val value: Int) {
     }
 
     fun uncover(id: String) {
-        this.up.down = this
         val op = globalOpCounter.incrementAndGet()
-        this.header.matrix.saveStateWithId("$op-uncover-before")
+        this.header.matrix.saveStateWithId("$id-$op-uncover-pre")
+        this.up.down = this
         logger.log("[$id] [${this.header.id}] [$op] [Col ${header.column}] [$this] Revealed ${this.row} to ${this.up.row} above")
         ops.add(("[$id] [${this.header.id}] [$op] [Col ${header.column}] [$this] Revealed ${this.row} to ${this.up.row} above"))
         this.down.up = this
         logger.log("[$id] [${this.header.id}] [$op] [Col ${header.column}] [$this] Revealed ${this.row} to ${this.down.row} below")
         ops.add("[$id] [${this.header.id}] [$op] [Col ${header.column}] [$this] Revealed ${this.row} to ${this.down.row} below")
         this.covered = false
-        this.header.matrix.saveStateWithId("$op-uncover-after")
 
+        this.header.matrix.saveStateWithId("$id-$op-uncover-post")
     }
 
     fun addUp(node: Node) {

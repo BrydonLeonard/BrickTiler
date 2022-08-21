@@ -59,6 +59,8 @@ class Header(val column: Int, val matrix: SparseMatrix, val desiredValue: Int = 
         this.right.left = this
         this.left.right = this
 
+        uncoverRow(last, id)
+
         var rowNode = last?.up
 
         // TODO sometimes this runs infinitely
@@ -69,8 +71,6 @@ class Header(val column: Int, val matrix: SparseMatrix, val desiredValue: Int = 
             uncoverRow(rowNode, id)
             rowNode = rowNode.up
         }
-
-        uncoverRow(rowNode, id)
     }
 
     /**
@@ -116,6 +116,8 @@ class Header(val column: Int, val matrix: SparseMatrix, val desiredValue: Int = 
 
             node.header.count--
 
+            val op = globalOpCounter.incrementAndGet()
+
             // All this nonsense because I didn't want special header nodes
             if (node.down == node) {
                 node.header.first = null
@@ -129,6 +131,8 @@ class Header(val column: Int, val matrix: SparseMatrix, val desiredValue: Int = 
                     node.header.last = node.up
                 }
             }
+
+            matrix.saveStateWithId("$op-headerUpdate-post")
 
             var rowNode = node.header.first
             var loopCount = 0
@@ -159,6 +163,10 @@ class Header(val column: Int, val matrix: SparseMatrix, val desiredValue: Int = 
 
         while (node != startingNode) {
             node.uncover(id)
+            if (node.up.covered || node.down.covered) {
+                val op = globalOpCounter.incrementAndGet()
+                matrix.saveStateWithId("$id-$op-fucked-${startingNode.header.column}-${startingNode.row}-${node.header.column}-${node.row}")
+            }
             node.header.count++
 
             // Null [first] means that there's nothing else uncovered currently. The uncovering node will become first and last
@@ -175,13 +183,13 @@ class Header(val column: Int, val matrix: SparseMatrix, val desiredValue: Int = 
                     node.header.last = node
                 }
             }
-            var rowNode = node.header.first
+            var rowNode = node.header.last
             var loopCount = 0
 
             val previouslySeen = HashSet<Node>()
             var foundLoop = false
 
-            while ((rowNode != node.header.first || loopCount < 1) && rowNode != null && node.down != node) {
+            while ((rowNode != node.header.last || loopCount < 1) && rowNode != null && node.up != node) {
                 if (!previouslySeen.add(rowNode) && !foundLoop) {
                     println("Loop is at ${rowNode.row}")
                     println("Dumping visualisation")
@@ -193,7 +201,7 @@ class Header(val column: Int, val matrix: SparseMatrix, val desiredValue: Int = 
                 if (loopCount % 100 == 0 && loopCount > 0) {
                     println("We've hit $loopCount!")
                 }
-                rowNode = rowNode.down
+                rowNode = rowNode.up
             }
 
             node = node.left

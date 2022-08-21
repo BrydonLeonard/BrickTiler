@@ -16,9 +16,11 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import java.io.File
+import java.nio.file.Files
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.io.path.Path
 import kotlin.math.abs
 
 
@@ -55,6 +57,9 @@ object ExactCoverSolver {
 
     fun solveOnce(matrix: SparseMatrix, config: SolutionConfig, dispatcher: CoroutineDispatcher): Solution? {
         var solution: Solution? = null
+        File("./vis").deleteRecursively()
+        Files.createDirectories(Path("./vis"))
+
         runBlocking(dispatcher) {
             val channel = Channel<Solution?>(100, BufferOverflow.DROP_LATEST)
 
@@ -168,6 +173,8 @@ object ExactCoverSolver {
                     solve(matrix, config, channel, depth + 1, currentSolution, validator, id)
                 }
 
+                matrix.uncoverColumn(node.header, id)
+
                 iterNode = node.left
 
                 while (iterNode != node) {
@@ -175,7 +182,6 @@ object ExactCoverSolver {
                     matrix.uncoverColumn(iterNode.header, id)
                     iterNode = iterNode.left
                 }
-                matrix.uncoverColumn(node.header, id)
 
                 matrix.saveStateWithId("${id}_${globalOpCounter.get()}_${row}_end")
 
