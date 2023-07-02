@@ -43,9 +43,6 @@ class Header(val column: Int, val matrix: SparseMatrix, val desiredValue: Int = 
 
         while ((rowNode != first || count < 1) && rowNode != null) {
             count++
-            if (count % 100 == 0) {
-                println("We've hit $count!")
-            }
             coverRow(rowNode, id)
             rowNode = rowNode.down
         }
@@ -134,17 +131,6 @@ class Header(val column: Int, val matrix: SparseMatrix, val desiredValue: Int = 
 
             matrix.saveStateWithId("$op-headerUpdate-post")
 
-            var rowNode = node.header.first
-            var loopCount = 0
-
-            while ((rowNode != node.header.first || loopCount < 1) && rowNode != null) {
-                loopCount++
-                if (loopCount % 100 == 0 && loopCount > 0) {
-                    println("We've hit $loopCount!")
-                }
-                rowNode = rowNode.down
-            }
-
             node = node.right
         }
     }
@@ -182,26 +168,6 @@ class Header(val column: Int, val matrix: SparseMatrix, val desiredValue: Int = 
                 if (node.up == node.header.last && node.up.row < node.row) {
                     node.header.last = node
                 }
-            }
-            var rowNode = node.header.last
-            var loopCount = 0
-
-            val previouslySeen = HashSet<Node>()
-            var foundLoop = false
-
-            while ((rowNode != node.header.last || loopCount < 1) && rowNode != null && node.up != node) {
-                if (!previouslySeen.add(rowNode) && !foundLoop) {
-                    println("Loop is at ${rowNode.row}")
-                    println("Dumping visualisation")
-
-                    File("pumlVis.puml").writeText(matrix.pumlCompatibleVisualisation(node.header.column))
-                    foundLoop = true
-                }
-                loopCount++
-                if (loopCount % 100 == 0 && loopCount > 0) {
-                    println("We've hit $loopCount!")
-                }
-                rowNode = rowNode.up
             }
 
             node = node.left

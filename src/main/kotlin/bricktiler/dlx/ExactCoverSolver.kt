@@ -1,6 +1,7 @@
 package bricktiler.dlx
 
 import bricktiler.Solution
+import bricktiler.board.BoardUtils
 import bricktiler.dlx.ExactCoverSolver.statTracker.badRowsDueToConstraints
 import bricktiler.dlx.ExactCoverSolver.statTracker.badRowsDueToCovered
 import bricktiler.dlx.ExactCoverSolver.statTracker.badRowsDueToError
@@ -12,6 +13,7 @@ import bricktiler.dlx.ExactCoverSolver.statTracker.maxDepth
 import bricktiler.dlx.ExactCoverSolver.statTracker.solutions
 import bricktiler.dlx.ExactCoverSolver.statTracker.up
 import bricktiler.dlx.Header.Companion.globalOpCounter
+import bricktiler.image.ImageManager
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
@@ -55,13 +57,14 @@ public data class SolutionConfig(
 
 object ExactCoverSolver {
 
-    fun solveOnce(matrix: SparseMatrix, config: SolutionConfig, dispatcher: CoroutineDispatcher): Solution? {
+    fun solveOnce(matrix: SparseMatrix, config: SolutionConfig, dispatcher: CoroutineDispatcher, errorCalculator: (Solution) -> Long): Solution? {
         var solution: Solution? = null
         File("./vis").deleteRecursively()
         Files.createDirectories(Path("./vis"))
 
+        var best: Solution? = null
         runBlocking(dispatcher) {
-            val channel = Channel<Solution?>(100, BufferOverflow.DROP_LATEST)
+            val channel = Channel<Solution?>(50000, BufferOverflow.DROP_LATEST)
 
             launch(dispatcher) {
                 try {
@@ -75,11 +78,23 @@ object ExactCoverSolver {
             }
 
             println("Solver running")
-            solution = channel.receive()
-            println("Received")
+            var latest: Solution? = null
+            var bestError: Long = 0
+            var received = 0
+            while ((latest != null || received == 0) && received < 50000) {
+                received++
+                latest = channel.receive()
+                if (latest != null) {
+                    val latestError = errorCalculator(latest)
+                    if (best == null || bestError > latestError) {
+                        best = latest
+                        bestError = latestError
+                    }
+                }
+            }
             coroutineContext.cancelChildren()
         }
-        return solution
+        return best
     }
 
     /**

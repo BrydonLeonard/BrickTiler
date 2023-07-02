@@ -216,7 +216,8 @@ class SparseMatrix private constructor(val width: Int, private val desiredValues
 
 
     fun saveStateWithId(id: String) {
-        File("./vis/$id.puml").writeText(pumlCompatibleVisualisation(title = "$id: ${Header.globalOpCounter.get()}"))
+        // No-op. Used this while looking for bugs
+        //File("./vis/$id.puml").writeText(pumlCompatibleVisualisation(title = "$id: ${Header.globalOpCounter.get()}"))
     }
 
     private fun columnCycles(header: Header): Boolean {

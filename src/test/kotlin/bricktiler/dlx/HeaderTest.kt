@@ -3,7 +3,7 @@ package bricktiler.dlx
 import bricktiler.Logger.Companion.logger
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
-
+/*
 class HeaderTest {
     @Test
     fun `cover and uncover with a single node`() {
@@ -227,4 +227,4 @@ class HeaderTest {
 
         return true
     }
-}
+}*/

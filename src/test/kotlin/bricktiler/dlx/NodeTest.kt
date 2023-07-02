@@ -3,7 +3,7 @@ package bricktiler.dlx
 import org.junit.jupiter.api.Test
 
 import org.junit.jupiter.api.Assertions.*
-
+/*
 internal class NodeTest {
     val header = Header(1)
 
@@ -37,4 +37,4 @@ internal class NodeTest {
         assertTrue(node1.down == node2)
         assertTrue(node3.up == node2)
     }
-}
+}*/

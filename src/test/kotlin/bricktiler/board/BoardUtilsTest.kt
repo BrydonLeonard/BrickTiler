@@ -1,5 +1,6 @@
 package bricktiler.board
 
+import bricktiler.Solution
 import bricktiler.board.BoardUtils.toTwoDimensions
 import org.hamcrest.MatcherAssert.assertThat
 import org.hamcrest.Matchers.containsInAnyOrder
@@ -22,6 +23,19 @@ class BoardUtilsTest {
                 assertTrue(expectValue == (sparseMatrix.headers[columnIndex].getNodeInRow(rowIndex) != null), "Mismatch in row $rowIndex, column $columnIndex")
             }
         }
+    }
+
+    @Test
+    fun `can calculate total error`() {
+        val board = Board(2, 2)
+        val (sparseMatrix, piecePositions) = BoardUtils.makeSparseMatrix(List(4) { 1 }, board, listOf(Pair(Piece(1, 1), 1), Pair(Piece(1, 1), 3)))
+
+        val solution = Solution()
+        solution.add(setOf(0, 5, 6, 7))
+
+        val error = BoardUtils.describeSolutionError(solution, board, piecePositions, listOf(1, 1, 1, 1))
+
+        assertEquals(6, error)
     }
 
     @Test

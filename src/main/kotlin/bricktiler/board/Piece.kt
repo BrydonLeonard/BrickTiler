@@ -2,7 +2,10 @@ package bricktiler.board
 
 import bricktiler.board.BoardUtils.toTwoDimensions
 
-data class Board(val width: Int, val height: Int)
+data class Board(val width: Int, val height: Int) {
+    val centerCol: Int = width / 2
+    val centerRow: Int = height / 2
+}
 
 data class Position(val x: Int, val y: Int)
 

@@ -45,9 +45,12 @@ class ImageManager private constructor(val image: ImagePlus) {
         fun downscaleFromFile(width: Int, height: Int, colourCount: Int, imagePath: String = "C:/Users/user-pc/Desktop/roll.jpg"): ImageManager {
             setupEnv()
 
+            val lowResWidth = width/2
+            val lowResHeight = height/2
+
             val imp = IJ.openImage(imagePath)
 
-            val downscaled = ImagePlus("huh?", imp.image.getScaledInstance(width, height, 0))
+            val downscaled = ImagePlus("huh?", imp.image.getScaledInstance(lowResWidth, lowResHeight, 0))
 
             ImageConverter(downscaled).run {
                 convertToGray8()
@@ -67,7 +70,7 @@ class ImageManager private constructor(val image: ImagePlus) {
             ColorProcessor(downscaledWithContrast.image).also { colorProcessor ->
                 repeat(height) { y ->
                     repeat(width) { x ->
-                        colorProcessor.setColor(colorMapping[downscaled.getPixel(x, y)[0] + 1])
+                        colorProcessor.setColor(colorMapping[downscaled.getPixel(x / 2, y / 2)[0] + 1])
                         colorProcessor.drawPixel(x, y)
                     }
                 }
