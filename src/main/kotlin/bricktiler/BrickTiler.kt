@@ -21,7 +21,11 @@ object BrickTiler {
     fun main(args: Array<String>) {
         val board = Board(32, 32)
         val image = ImageManager.downscaleFromFile(board.width, board.height, 4, imagePath = "C:/Users/user-pc/Desktop/poo2.png")
-        val desiredSolution = image.asOneDimensionalArray().map { it }
+        val desiredSolution = image.asOneDimensionalArray().map { when(it) {
+            1 -> 2
+            2 -> 1
+            else -> it
+        } }
 
         println("Desired image is:\n$image")
 
